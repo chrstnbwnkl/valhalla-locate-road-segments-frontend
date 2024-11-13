@@ -4,11 +4,10 @@ import TileLayer from "ol/layer/Tile.js";
 import VectorSource from "ol/source/Vector.js";
 import VectorLayer from "ol/layer/Vector.js";
 import View from "ol/View.js";
-import polyline from '@mapbox/polyline';
 import { useGeographic } from "ol/proj.js";
 import { Feature } from "ol";
 import { LineString, Point } from "ol/geom.js";
-import { Link } from 'ol/interaction.js';
+import { Link } from "ol/interaction.js";
 
 useGeographic();
 
@@ -97,18 +96,15 @@ const palette = [
 ];
 
 function makeMatchExpression(palette, opacity) {
-  const expression = [
-    "match",
-    ["%", ["get", "id"], palette.length]
-  ];
+  const expression = ["match", ["%", ["get", "id"], palette.length]];
   opacity = opacity ?? 1;
   palette.forEach((rgb, i, a) => {
-    const color = "rgba(" + rgb.join(', ') + ", " + opacity + ")";
+    const color = "rgba(" + rgb.join(", ") + ", " + opacity + ")";
     if (i + 1 < a.length) {
       expression.push(i);
     }
     expression.push(color);
-  })
+  });
   return expression;
 }
 
@@ -123,14 +119,8 @@ const clickedLocationLayer = createLayer({
 const nodeLayer = createLayer({
   style: [
     {
-      "style": {
-        "circle-radius": [
-          "match",
-          ["%", ['get', 'id'], 2],
-          0,
-          12,
-          7,
-        ],
+      style: {
+        "circle-radius": ["match", ["%", ["get", "id"], 2], 0, 12, 7],
         "circle-fill-color": makeMatchExpression(palette, 0.5),
         "circle-stroke-color": makeMatchExpression(palette),
         "circle-stroke-width": 2,
@@ -141,15 +131,9 @@ const nodeLayer = createLayer({
 const segmentLayer = createLayer({
   style: [
     {
-      "style": {
+      style: {
         "stroke-color": makeMatchExpression(palette, 0.7),
-        "stroke-width": [
-          "match",
-          ["%", ['get', 'id'], 2],
-          0,
-          7,
-          3,
-        ],
+        "stroke-width": ["match", ["%", ["get", "id"], 2], 0, 7, 3],
       },
     },
   ],
@@ -186,6 +170,8 @@ async function handleClick(e) {
       costing: "auto",
       verbose: true,
       road_segments: true,
+      radius: 1,
+      node_snap_tolerance: 0,
     }),
   });
 
@@ -204,6 +190,7 @@ async function handleClick(e) {
   for (const edge of json[0].edges) {
     ++id;
     const seg = edge.full_road_segment;
+    console.log(seg.percent_along);
     if (seg.shape) {
       const geom = decodePolyline(seg.shape);
       segments.push(lineFromCoordinates(geom, id));
@@ -217,7 +204,7 @@ async function handleClick(e) {
       nodes.push(
         pointFromCoordinates([sn.node.lon, sn.node.lat], id),
         pointFromCoordinates([seg.mid_point.lon, seg.mid_point.lat], id),
-        pointFromCoordinates([en.node.lon, en.node.lat], id),
+        pointFromCoordinates([en.node.lon, en.node.lat], id)
       );
     }
   }
