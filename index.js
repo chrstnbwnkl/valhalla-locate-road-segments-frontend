@@ -1,33 +1,16 @@
 import Map from "ol/Map.js";
 import OSM from "ol/source/OSM.js";
 import TileLayer from "ol/layer/Tile.js";
-import VectorSource from "ol/source/Vector";
-import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector.js";
+import VectorLayer from "ol/layer/Vector.js";
 import View from "ol/View.js";
-import { useGeographic } from "ol/proj";
+import polyline from '@mapbox/polyline';
+import { useGeographic } from "ol/proj.js";
 import { Feature } from "ol";
-import { LineString, Point } from "ol/geom";
+import { LineString, Point } from "ol/geom.js";
+import { Link } from 'ol/interaction.js';
 
 useGeographic();
-
-const CLICK_STYLE = {
-  "circle-radius": 7,
-  "circle-fill-color": "rgba(255, 0, 0, 0.5)",
-  "circle-stroke-color": "rgba(255, 0, 0, 1)",
-  "circle-stroke-width": 2,
-};
-
-const NODE_STYLE = {
-  "circle-radius": 7,
-  "circle-fill-color": "rgba(0, 153, 51, 0.5)",
-  "circle-stroke-color": "rgba(0, 153, 51, 1)",
-  "circle-stroke-width": 2,
-};
-
-const SEGMENT_STYLE = {
-  "stroke-color": "rgb(0, 153, 51)",
-  "stroke-width": 4,
-};
 
 function createLayer(layerArgs = {}, sourceArgs = {}) {
   return new VectorLayer({
@@ -36,12 +19,18 @@ function createLayer(layerArgs = {}, sourceArgs = {}) {
   });
 }
 
-function pointFromCoordinates(coords) {
-  return new Feature({ geometry: new Point(coords) });
+function pointFromCoordinates(coords, id) {
+  return new Feature({
+    id,
+    geometry: new Point(coords),
+  });
 }
 
-function lineFromCoordinates(coords) {
-  return new Feature({ geometry: new LineString(coords) });
+function lineFromCoordinates(coords, id) {
+  return new Feature({
+    id,
+    geometry: new LineString(coords),
+  });
 }
 
 function makeValhallaLocation(coords) {
@@ -96,9 +85,75 @@ function decodePolyline(str, precision) {
   return coordinates;
 }
 
-const clickedLocationLayer = createLayer({ style: CLICK_STYLE });
-const nodeLayer = createLayer({ style: NODE_STYLE });
-const segmentLayer = createLayer({ style: SEGMENT_STYLE });
+const palette = [
+  [0, 63, 92],
+  [212, 80, 135],
+  [47, 75, 124],
+  [249, 93, 106],
+  [102, 81, 145],
+  [255, 124, 67],
+  [160, 81, 149],
+  [255, 166, 0],
+];
+
+function makeMatchExpression(palette, opacity) {
+  const expression = [
+    "match",
+    ["%", ["get", "id"], palette.length]
+  ];
+  opacity = opacity ?? 1;
+  palette.forEach((rgb, i, a) => {
+    const color = "rgba(" + rgb.join(', ') + ", " + opacity + ")";
+    if (i + 1 < a.length) {
+      expression.push(i);
+    }
+    expression.push(color);
+  })
+  return expression;
+}
+
+const clickedLocationLayer = createLayer({
+  style: {
+    "circle-radius": 5,
+    "circle-fill-color": "rgba(255, 0, 0, 0.5)",
+    "circle-stroke-color": "rgba(255, 0, 0, 1)",
+    "circle-stroke-width": 2,
+  },
+});
+const nodeLayer = createLayer({
+  style: [
+    {
+      "style": {
+        "circle-radius": [
+          "match",
+          ["%", ['get', 'id'], 2],
+          0,
+          12,
+          7,
+        ],
+        "circle-fill-color": makeMatchExpression(palette, 0.5),
+        "circle-stroke-color": makeMatchExpression(palette),
+        "circle-stroke-width": 2,
+      },
+    },
+  ],
+});
+const segmentLayer = createLayer({
+  style: [
+    {
+      "style": {
+        "stroke-color": makeMatchExpression(palette, 0.7),
+        "stroke-width": [
+          "match",
+          ["%", ['get', 'id'], 2],
+          0,
+          7,
+          3,
+        ],
+      },
+    },
+  ],
+});
 
 const map = new Map({
   layers: [
@@ -106,8 +161,8 @@ const map = new Map({
       source: new OSM(),
     }),
     segmentLayer,
-    clickedLocationLayer,
     nodeLayer,
+    clickedLocationLayer,
   ],
   target: "map",
   view: new View({
@@ -115,6 +170,7 @@ const map = new Map({
     zoom: 11,
   }),
 });
+map.addInteraction(new Link());
 
 async function handleClick(e) {
   // add clicked location
@@ -133,30 +189,41 @@ async function handleClick(e) {
     }),
   });
 
+  nodeLayer.getSource().clear();
+  segmentLayer.getSource().clear();
+
   const json = await res.json();
 
   if (!json[0].edges) {
     return;
   }
 
+  const nodes = [];
+  const segments = [];
+  let id = -1;
   for (const edge of json[0].edges) {
+    ++id;
     const seg = edge.full_road_segment;
-    const geom = decodePolyline(seg.shape);
-    segmentLayer.getSource().clear();
-    segmentLayer.getSource().addFeature(lineFromCoordinates(geom));
+    if (seg.shape) {
+      const geom = decodePolyline(seg.shape);
+      segments.push(lineFromCoordinates(geom, id));
+    }
 
     // add nodes as well
-    nodeLayer.getSource().clear();
-    const sn = seg.intersections.start_node;
-    const en = seg.intersections.end_node;
-    console.log(en);
-    nodeLayer
-      .getSource()
-      .addFeature(pointFromCoordinates([sn.node.lon, sn.node.lat]));
-    nodeLayer
-      .getSource()
-      .addFeature(pointFromCoordinates([en.node.lon, en.node.lat]));
+    if (seg.intersections) {
+      const sn = seg.intersections.start_node;
+      const en = seg.intersections.end_node;
+      console.log(en);
+      nodes.push(
+        pointFromCoordinates([sn.node.lon, sn.node.lat], id),
+        pointFromCoordinates([seg.mid_point.lon, seg.mid_point.lat], id),
+        pointFromCoordinates([en.node.lon, en.node.lat], id),
+      );
+    }
   }
+
+  nodeLayer.getSource().addFeatures(nodes);
+  segmentLayer.getSource().addFeatures(segments);
 }
 
 map.on("click", handleClick);
