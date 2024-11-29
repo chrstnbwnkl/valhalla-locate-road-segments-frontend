@@ -1,0 +1,30 @@
+body {
+    font-family: 'Courier New', Courier, monospace;
+}
+#map-actions {
+    z-index: 10;
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    display: flex;
+align-items: flex-start;
+justify-content: end;
+
+}
+
+#map-actions a {
+    pointer-events: auto; 
+    padding: 10px;
+    margin: 10px;
+    background-color: cornflowerblue;
+    border: 2px  solid white;
+    border-radius: 5px;
+    color: white;
+    font-size: medium;
+    cursor: pointer;
+}
+
+#map-actions a:hover {
+    background-color: rgb(72, 107, 172);
+}

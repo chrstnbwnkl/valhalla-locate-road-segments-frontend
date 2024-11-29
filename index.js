@@ -18,10 +18,11 @@ function createLayer(layerArgs = {}, sourceArgs = {}) {
   });
 }
 
-function pointFromCoordinates(coords, id) {
+function pointFromCoordinates(coords, id, deadend) {
   return new Feature({
     id,
     geometry: new Point(coords),
+    deadend,
   });
 }
 
@@ -123,7 +124,15 @@ const nodeLayer = createLayer({
         "circle-radius": ["match", ["%", ["get", "id"], 2], 0, 12, 7],
         "circle-fill-color": makeMatchExpression(palette, 0.5),
         "circle-stroke-color": makeMatchExpression(palette),
-        "circle-stroke-width": 2,
+        "circle-stroke-width": [
+          "match",
+          ["get", "deadend"],
+          true,
+          5,
+          false,
+          2,
+          2,
+        ],
       },
     },
   ],
@@ -154,7 +163,8 @@ const map = new Map({
     zoom: 11,
   }),
 });
-map.addInteraction(new Link());
+const link = new Link({ params: ["x", "y", "z"] });
+map.addInteraction(link);
 
 async function handleClick(e) {
   // add clicked location
@@ -190,7 +200,6 @@ async function handleClick(e) {
   for (const edge of json[0].edges) {
     ++id;
     const seg = edge.full_road_segment;
-    console.log(seg.percent_along);
     if (seg.shape) {
       const geom = decodePolyline(seg.shape);
       segments.push(lineFromCoordinates(geom, id));
@@ -202,9 +211,9 @@ async function handleClick(e) {
       const en = seg.intersections.end_node;
       console.log(en);
       nodes.push(
-        pointFromCoordinates([sn.node.lon, sn.node.lat], id),
+        pointFromCoordinates([sn.node.lon, sn.node.lat], id, sn.deadend),
         pointFromCoordinates([seg.mid_point.lon, seg.mid_point.lat], id),
-        pointFromCoordinates([en.node.lon, en.node.lat], id)
+        pointFromCoordinates([en.node.lon, en.node.lat], id, en.deadend)
       );
     }
   }
@@ -214,3 +223,19 @@ async function handleClick(e) {
 }
 
 map.on("click", handleClick);
+
+function getOSMUrl(x, y, z) {
+  return `https://osm.org/#map=${z}/${y}/${x}`;
+}
+
+const osmButton = document.getElementById("osm-link");
+function handleLinkChange(e) {
+  let params = new URLSearchParams(document.location.search);
+  osmButton.href = getOSMUrl(
+    params.get("x"),
+    params.get("y"),
+    Math.round(Number(params.get("z")))
+  );
+}
+
+map.on("moveend", handleLinkChange);

@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Valhalla Debug</title>
-    <link rel="stylesheet" href="node_modules/ol/ol.css">
+    <link rel="stylesheet" href="node_modules/ol/ol.css" />
+    <link rel="stylesheet" href="index.css" />
     <style>
-        html, body {
-            margin: 0;
-        }
+      html,
+      body {
+        margin: 0;
+      }
     </style>
-</head>
-<body>
-    <div id="map" style="height: 100vh; width: 100vw;"></div>
+  </head>
+  <body>
+    <div id="map" style="height: 100vh; width: 100vw; position: absolute"></div>
+    <div id="map-actions">
+      <a id="osm-link" target="_blank">View on OSM</a>
+    </div>
     <script type="module" src="index.js"></script>
-</body>
+  </body>
 </html>
